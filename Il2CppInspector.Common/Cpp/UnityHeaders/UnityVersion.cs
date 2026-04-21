@@ -59,7 +59,7 @@ namespace Il2CppInspector.Cpp.UnityHeaders
         public UnityVersion(string versionString) {
             var match = VersionRegex().Match(versionString);
             if (!match.Success)
-                throw new ArgumentException($"'${versionString}' is not a valid Unity version number.");
+                throw new ArgumentException($"'{versionString}' is not a valid Unity version number.");
             Major = int.Parse(match.Groups[1].Value);
             Minor = int.Parse(match.Groups[2].Value);
             Update = match.Groups[3].Success ? int.Parse(match.Groups[3].Value) : 0;
@@ -165,20 +165,24 @@ namespace Il2CppInspector.Cpp.UnityHeaders
 
         // Create a version range from a string, in the format "[Il2CppInspector.Cpp.<namespace-leaf>.][metadataVersion-]<min>-[max].h"
         public static UnityVersionRange FromFilename(string headerFilename) {
-            var baseNamespace = "Il2CppInspector.Cpp.";
             headerFilename = headerFilename.Replace(".h", "");
 
-            if (headerFilename.StartsWith(baseNamespace)) {
-                headerFilename = headerFilename.Substring(baseNamespace.Length);
-                headerFilename = headerFilename.Substring(headerFilename.IndexOf(".") + 1);
+            var typeHeaderNamespace = "UnityHeaders.";
+            var apiHeaderNamespace = "Il2CppAPIHeaders.";
+            var namespaceIndex = headerFilename.LastIndexOf(typeHeaderNamespace, StringComparison.Ordinal);
+            if (namespaceIndex >= 0)
+                headerFilename = headerFilename[(namespaceIndex + typeHeaderNamespace.Length)..];
+            else
+            {
+                namespaceIndex = headerFilename.LastIndexOf(apiHeaderNamespace, StringComparison.Ordinal);
+                if (namespaceIndex >= 0)
+                    headerFilename = headerFilename[(namespaceIndex + apiHeaderNamespace.Length)..];
             }
 
             var bits = headerFilename.Split("-");
 
-            // Metadata version supplied
-            // Note: This relies on the metadata version being 2/3/4 characters,
-            // and that the smallest Unity version must be 5 characters or more
-            if (headerFilename.Substring(2, 3).Contains('-'))
+            // Strip an optional metadata version prefix like 29.1- or 104-.
+            if (bits.Length > 1 && Regex.IsMatch(bits[0], @"^\d{1,3}(?:\.\d+)?$"))
                 bits = bits.Skip(1).ToArray();
 
             var Min = new UnityVersion(bits[0]);

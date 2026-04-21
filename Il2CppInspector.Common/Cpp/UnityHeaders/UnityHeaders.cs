@@ -115,7 +115,7 @@ namespace Il2CppInspector.Cpp.UnityHeaders
             foreach (var r in GetAllTypeHeaders()) {
                 var metadataVersion = GetMetadataVersionFromFilename(r.Name);
 
-                if (metadataVersion != binary.Image.Version)
+                if (!MetadataVersionMatchesHeader(metadataVersion, binary.Image.Version))
                     continue;
                 if (metadataVersion == MetadataVersions.V210) {
                     /* Special version logic for metadata version 21 based on the Il2CppMetadataRegistration.fieldOffsets field */
@@ -199,6 +199,22 @@ namespace Il2CppInspector.Cpp.UnityHeaders
         // Get the metadata version from a type header resource name
         private static StructVersion GetMetadataVersionFromFilename(string resourceName)
             => resourceName[(typeof(UnityHeaders).Namespace!.Length + 1)..].Split('-')[0];
+
+        private static bool MetadataVersionMatchesHeader(StructVersion headerVersion, StructVersion binaryVersion)
+        {
+            // Unity 2022-era v29 binaries use the 29.1 type header family even though the binary-side version
+            // discriminator is represented as 29.0 with a "2022" tag in this project.
+            if (binaryVersion.Tag == MetadataVersions.Tag2022
+                && binaryVersion.Major == MetadataVersions.V290.Major
+                && binaryVersion.Minor == MetadataVersions.V290.Minor)
+            {
+                return headerVersion.Major == MetadataVersions.V290.Major
+                    && headerVersion.Minor == 1;
+            }
+
+            return headerVersion.Major == binaryVersion.Major
+                && headerVersion.Minor == binaryVersion.Minor;
+        }
 
         // Equality comparisons
         public static bool operator ==(UnityHeaders first, UnityHeaders second) {

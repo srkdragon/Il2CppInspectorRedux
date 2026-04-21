@@ -206,6 +206,9 @@ namespace Il2CppInspector
                         Version = MetadataVersions.V242;
                         Header = ReadVersionedObject<Il2CppGlobalMetadataHeader>(0);
                     }
+                    else if (TryUpgradePadded2022MetadataVersion(realHeaderLength)) {
+                        Header = ReadVersionedObject<Il2CppGlobalMetadataHeader>(0);
+                    }
                 }
 
                 if (realHeaderLength != Sizeof<Il2CppGlobalMetadataHeader>()) {
@@ -436,6 +439,50 @@ namespace Il2CppInspector
             }
 
             return ReadVersionedObjectArray<T>(oldOffset, oldSize / Sizeof<T>());
+        }
+
+        private bool TryUpgradePadded2022MetadataVersion(int realHeaderLength)
+        {
+            if (Version >= MetadataVersions.V380)
+                return false;
+
+            if (Version != MetadataVersions.V290 && Version != MetadataVersions.V310)
+                return false;
+
+            var taggedVersion = new StructVersion(Version.Major, Version.Minor, MetadataVersions.Tag2022);
+            var taggedHeaderLength = Il2CppGlobalMetadataHeader.StructSize(taggedVersion);
+            if (realHeaderLength != taggedHeaderLength)
+                return false;
+
+            var currentHeaderLength = Sizeof<Il2CppGlobalMetadataHeader>();
+            if (!HasOnlyZeroPadding(currentHeaderLength, taggedHeaderLength - currentHeaderLength))
+                return false;
+
+            Version = taggedVersion;
+            return true;
+        }
+
+        private bool HasOnlyZeroPadding(int offset, int size)
+        {
+            if (size <= 0)
+                return false;
+
+            var currentPosition = Position;
+            try
+            {
+                Position = offset;
+                foreach (var value in ReadBytes(size))
+                {
+                    if (value != 0)
+                        return false;
+                }
+
+                return true;
+            }
+            finally
+            {
+                Position = currentPosition;
+            }
         }
 
         // Save metadata to file, overwriting if necessary

@@ -31,7 +31,7 @@ namespace Il2CppInspector
         public Dictionary<ulong, ulong> FunctionAddresses { get; }
 
         // Attribute indexes (>=24.1) arranged by customAttributeStart and token
-        public Dictionary<int, Dictionary<uint, int>> AttributeIndicesByToken { get; }
+        public Dictionary<int, Dictionary<uint, List<int>>> AttributeIndicesByToken { get; }
 
         // Merged list of all metadata usage references
         public List<MetadataUsage> MetadataUsages { get; }
@@ -282,12 +282,21 @@ namespace Il2CppInspector
                 AttributeIndicesByToken = [];
                 foreach (var image in Images)
                 {
-                    var attsByToken = new Dictionary<uint, int>();
+                    var attsByToken = new Dictionary<uint, List<int>>();
                     for (int i = 0; i < image.CustomAttributeCount; i++)
                     {
                         var index = image.CustomAttributeStart + i;
+                        if (Version >= MetadataVersions.V290 && index >= AttributeDataRanges.Length)
+                            break;
+
                         var token = Version >= MetadataVersions.V290 ? AttributeDataRanges[index].Token : AttributeTypeRanges[index].Token;
-                        attsByToken.Add(token, index);
+                        if (!attsByToken.TryGetValue(token, out var indices))
+                        {
+                            indices = [];
+                            attsByToken.Add(token, indices);
+                        }
+
+                        indices.Add(index);
                     }
 
                     if (attsByToken.Count > 0)

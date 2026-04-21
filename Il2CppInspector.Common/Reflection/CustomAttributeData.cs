@@ -116,10 +116,11 @@ namespace Il2CppInspector.Reflection
                 if (!asm.Model.AttributesByDataIndices.TryGetValue(customAttributeIndex, out var attributes))
                 {
                     var range = pkg.Metadata.AttributeDataRanges[customAttributeIndex];
-                    var next = pkg.Metadata.AttributeDataRanges[customAttributeIndex + 1];
 
                     var startOffset = (uint)pkg.Metadata.AttributeDataOffset + range.StartOffset;
-                    var endOffset = (uint)pkg.Metadata.AttributeDataOffset + next.StartOffset;
+                    var endOffset = customAttributeIndex + 1 < pkg.Metadata.AttributeDataRanges.Length
+                        ? (uint)pkg.Metadata.AttributeDataOffset + pkg.Metadata.AttributeDataRanges[customAttributeIndex + 1].StartOffset
+                        : (uint)pkg.Metadata.AttributeDataOffset + (uint)pkg.Metadata.Header.AttributeDataSize;
 
                     var reader = new CustomAttributeDataReader(pkg, asm, pkg.Metadata, startOffset, endOffset);
                     if (reader.Count == 0)
@@ -141,7 +142,9 @@ namespace Il2CppInspector.Reflection
         }
 
         public static IList<CustomAttributeData> GetCustomAttributes(Assembly asm, int token, int customAttributeIndex) =>
-                getCustomAttributes(asm, asm.Model.GetCustomAttributeIndex(asm, token, customAttributeIndex)).ToList();
+                asm.Model.GetCustomAttributeIndices(asm, token, customAttributeIndex)
+                    .SelectMany(index => getCustomAttributes(asm, index))
+                    .ToList();
             
         public static IList<CustomAttributeData> GetCustomAttributes(Assembly asm) => GetCustomAttributes(asm, asm.MetadataToken, asm.AssemblyDefinition.CustomAttributeIndex);
         public static IList<CustomAttributeData> GetCustomAttributes(EventInfo evt) => GetCustomAttributes(evt.Assembly, evt.MetadataToken, evt.Definition.CustomAttributeIndex);

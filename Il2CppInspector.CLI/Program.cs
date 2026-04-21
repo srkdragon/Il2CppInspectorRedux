@@ -318,7 +318,7 @@ namespace Il2CppInspector.CLI
                     isExtractedFromPackage = true;
                 }
                 catch (Exception ex) {
-                    Console.Error.WriteLine(ex.Message);
+                    Console.Error.WriteLine(ex);
                     return 1;
                 }
 
@@ -334,7 +334,7 @@ namespace Il2CppInspector.CLI
                         il2cppInspectors = Il2CppInspector.LoadFromFile(options.BinaryFiles.First(), options.MetadataFile, loadOptions);
                     }
                     catch (Exception ex) {
-                        Console.Error.WriteLine(ex.Message);
+                        Console.Error.WriteLine(ex);
                         return 1;
                     }
                 }
@@ -399,8 +399,16 @@ namespace Il2CppInspector.CLI
 
                 // Create type model
                 TypeModel model;
-                using (new Benchmark("Create .NET type model"))
-                    model = new TypeModel(il2cpp);
+                try
+                {
+                    using (new Benchmark("Create .NET type model"))
+                        model = new TypeModel(il2cpp);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(ex);
+                    return 1;
+                }
 
                 // Create application model only if needed
                 AppModel appModel = null;

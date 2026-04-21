@@ -1,5 +1,7 @@
 ﻿using VersionedSerialization.Attributes;
 
+using System.Runtime.CompilerServices;
+
 namespace Il2CppInspector.Next.Metadata;
 
 // Unity 4.6.1p5 - first release, no global-metadata.dat
@@ -23,6 +25,14 @@ namespace Il2CppInspector.Next.Metadata;
 // Unity 2021.1.0f1 -> v27.2
 // https://unity3d.com/get-unity/download/archive
 // Metadata version is written at the end of Unity.IL2CPP.MetadataCacheWriter.WriteLibIl2CppMetadata or WriteMetadata (Unity.IL2CPP.dll)
+
+[InlineArray(PaddingLength)]
+public struct MetadataHeaderPadding2022
+{
+    private const int PaddingLength = 0x70;
+
+    private byte _value;
+}
 
 [VersionedStruct]
 public partial record struct Il2CppGlobalMetadataHeader
@@ -346,6 +356,9 @@ public partial record struct Il2CppGlobalMetadataHeader
     [VersionCondition(GreaterThanOrEqual = "38.0")]
     public Il2CppSectionMetadata ExportedTypeDefinitions { get; private set; }
 
+    [VersionCondition(EqualTo = "29.0", IncludingTag = "2022")]
+    [VersionCondition(EqualTo = "31.0", IncludingTag = "2022")]
+    private MetadataHeaderPadding2022 _padding2022;
 
     public const int ExpectedSanity = unchecked((int)0xFAB11BAF);
     public readonly bool SanityValid => Sanity == ExpectedSanity;

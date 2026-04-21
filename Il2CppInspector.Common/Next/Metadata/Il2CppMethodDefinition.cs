@@ -14,6 +14,7 @@ public partial record struct Il2CppMethodDefinition
     public TypeDefinitionIndex DeclaringType { get; private set; }
     public TypeIndex ReturnType { get; private set; }
 
+    [VersionCondition(EqualTo = "29.0", IncludingTag = "2022")]
     [VersionCondition(GreaterThanOrEqual = "31.0")]
     public uint ReturnParameterToken { get; private set; }
 
