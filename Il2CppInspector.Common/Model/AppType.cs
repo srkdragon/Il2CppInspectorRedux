@@ -47,6 +47,9 @@ namespace Il2CppInspector.Model
         // Prefer Foo over Foo__Boxed; if there is no C++ type defined, just convert the IL type to a C identifier
         public string Name => CppValueType?.Name ?? CppType?.Name ?? Type.Name.ToCIdentifier();
 
+        // Concrete generated C++ type name, if this type actually has one in the emitted headers.
+        public string CppName => CppValueType?.Name ?? CppType?.Name;
+
         public override string ToString() => Type.FullName + " -> " + CppType.Name;
 
         public string ToMangledTypeInfoString() => MangledNameBuilder.TypeInfo(Type);

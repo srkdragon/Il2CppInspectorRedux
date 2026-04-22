@@ -17,6 +17,7 @@ namespace Il2CppInspector.Outputs
     {
         private readonly AppModel model;
         private Utf8JsonWriter writer;
+        private HashSet<string> emittedTypeNames = [];
 
         // Allow non-compliant C-style comments in JSON output
         public bool AllowComments { get; set; } = false;
@@ -25,6 +26,9 @@ namespace Il2CppInspector.Outputs
 
         // Write JSON metadata to file
         public void Write(string outputFile) {
+            emittedTypeNames = new HashSet<string>(model.RequiredForwardDefinitions
+                .Concat(model.DependencyOrderedCppTypes)
+                .Select(t => t.Name));
 
             using var fs = new FileStream(outputFile, FileMode.Create);
             writer = new Utf8JsonWriter(fs, options: new JsonWriterOptions { Indented = true });
@@ -107,9 +111,11 @@ namespace Il2CppInspector.Outputs
                     foreach (var type in model.Types.Values) {
                         // A type may have no addresses, for example an unreferenced array type
 
-                        if (type.TypeClassAddress != 0xffffffff_ffffffff) {
+                        if (type.TypeClassAddress != 0xffffffff_ffffffff
+                            && type.CppName != null
+                            && emittedTypeNames.Contains(type.CppName + "__Class")) {
                             writeObject(() => {
-                                writeTypedName(type.TypeClassAddress, $"struct {type.Name}__Class *", type.ToMangledTypeInfoString());
+                                writeTypedName(type.TypeClassAddress, $"struct {type.CppName}__Class *", type.ToMangledTypeInfoString());
                                 writeDotNetTypeName(type.Type);
                             });
                         }

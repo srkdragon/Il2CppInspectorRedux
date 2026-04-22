@@ -148,6 +148,9 @@ namespace Il2CppInspector.Outputs
             var srcUserPath = Path.Combine(projectPath, "user");
             var srcFxPath = Path.Combine(projectPath, "framework");
             var srcDataPath = Path.Combine(projectPath, "appdata");
+            var emittedTypeNames = new HashSet<string>(_model.RequiredForwardDefinitions
+                .Concat(_model.DependencyOrderedCppTypes)
+                .Select(t => t.Name));
 
             Directory.CreateDirectory(projectPath);
             Directory.CreateDirectory(srcUserPath);
@@ -214,9 +217,11 @@ namespace Il2CppInspector.Outputs
                 writeHeader();
                 writeSectionHeader("IL2CPP application-specific type definition addresses");
 
-                foreach (var type in _model.Types.Values.Where(t => t.TypeClassAddress != 0xffffffff_ffffffff))
+                foreach (var type in _model.Types.Values.Where(t => t.TypeClassAddress != 0xffffffff_ffffffff
+                                                                   && t.CppName != null
+                                                                   && emittedTypeNames.Contains(t.CppName + "__Class")))
                 {
-                    writeCode($"DO_TYPEDEF(0x{type.TypeClassAddress - _model.Package.BinaryImage.ImageBase:X8}, {type.Name});");
+                    writeCode($"DO_TYPEDEF(0x{type.TypeClassAddress - _model.Package.BinaryImage.ImageBase:X8}, {type.CppName});");
                 }
             }
 

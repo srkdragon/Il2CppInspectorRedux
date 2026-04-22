@@ -153,6 +153,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 #include "pch-il2cpp.h"
 
 #define WIN32_LEAN_AND_MEAN
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 #include &lt;windows.h&gt;
 #include &lt;string&gt;
 #include &lt;codecvt&gt;
@@ -1289,6 +1290,8 @@ void Run();</value>
 
 #ifndef PCH_IL2CPP_H
 #define PCH_IL2CPP_H
+
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 
 // add headers that you want to pre-compile here
 #include "il2cpp-appdata.h"
