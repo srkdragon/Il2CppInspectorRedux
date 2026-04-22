@@ -11,7 +11,9 @@ using Il2CppInspector.Next.Metadata;
 using Spectre.Console;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.IO;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using VersionedSerialization;
 
@@ -19,6 +21,8 @@ namespace Il2CppInspector
 {
     public abstract partial class Il2CppBinary
     {
+        private static readonly string[] ExportMapSuffixes = [".il2cpp-exports.json", ".exports.json"];
+
         // File image
         public IFileFormatStream Image { get; }
 
@@ -493,18 +497,137 @@ namespace Il2CppInspector
         // (therefore ignoring extern imports)
         // Some binaries have functions starting "il2cpp_z_" - ignore these too
         private void DiscoverAPIExports() {
-             var exports = Image.GetExports()?
-                .Where(e => (e.Name.StartsWith("il2cpp_") || e.Name.StartsWith("_il2cpp_") || e.Name.StartsWith("__il2cpp_"))
-                    && !e.Name.Contains("il2cpp_z_"));
+            var exports = Image.GetExports()?
+                .Where(e => !string.IsNullOrWhiteSpace(e.Name));
 
             if (exports == null)
                 return;
 
             var exportRgx = new Regex(@"^_+");
-            
-            foreach (var export in exports)
-                if (Image.TryMapVATR(export.VirtualAddress, out _))
-                    APIExports.Add(exportRgx.Replace(export.Name, ""), export.VirtualAddress);
+            var mappedExportNames = LoadApiExportNameMap();
+
+            foreach (var export in exports) {
+                var exportName = NormalizeExportName(export.Name, mappedExportNames, exportRgx);
+                if (string.IsNullOrEmpty(exportName) || exportName.Contains("il2cpp_z_"))
+                    continue;
+
+                if (Image.TryMapVATR(export.VirtualAddress, out _) && !APIExports.ContainsKey(exportName))
+                    APIExports.Add(exportName, export.VirtualAddress);
+            }
+        }
+
+        private Dictionary<string, string> LoadApiExportNameMap() {
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            var explicitMapPath = Image.ApiExportMapFilePath;
+
+            foreach (var mapPath in GetApiExportMapPaths()) {
+                if (!File.Exists(mapPath))
+                    continue;
+
+                try {
+                    var loaded = ParseApiExportNameMap(mapPath);
+                    foreach (var (obfuscatedName, exportName) in loaded)
+                        map.TryAdd(obfuscatedName, exportName);
+
+                    if (loaded.Count > 0)
+                        AnsiConsole.WriteLine($"Using IL2CPP API export map {mapPath} ({loaded.Count} names)");
+
+                    return map;
+                }
+                catch (Exception ex) when (ex is IOException or JsonException or InvalidOperationException) {
+                    AnsiConsole.WriteLine($"Warning: could not load IL2CPP API export map {mapPath}: {ex.Message}");
+
+                    if (!string.IsNullOrWhiteSpace(explicitMapPath)
+                        && string.Equals(Path.GetFullPath(mapPath), Path.GetFullPath(explicitMapPath), StringComparison.OrdinalIgnoreCase))
+                        return map;
+                }
+            }
+
+            return map;
+        }
+
+        private IEnumerable<string> GetApiExportMapPaths() {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (!string.IsNullOrWhiteSpace(Image.ApiExportMapFilePath)) {
+                var explicitPath = Path.GetFullPath(Image.ApiExportMapFilePath);
+                if (seen.Add(explicitPath))
+                    yield return explicitPath;
+            }
+
+            if (string.IsNullOrWhiteSpace(Image.BinaryFilePath))
+                yield break;
+
+            var binaryPath = Path.GetFullPath(Image.BinaryFilePath);
+            var directory = Path.GetDirectoryName(binaryPath);
+            var fileStem = Path.Combine(directory!, Path.GetFileNameWithoutExtension(binaryPath));
+
+            foreach (var suffix in ExportMapSuffixes) {
+                var candidatePath = fileStem + suffix;
+                if (seen.Add(candidatePath))
+                    yield return candidatePath;
+            }
+        }
+
+        private static Dictionary<string, string> ParseApiExportNameMap(string mapPath) {
+            using var json = JsonDocument.Parse(File.ReadAllText(mapPath));
+
+            var root = json.RootElement;
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("exports", out var nestedExports)
+                && nestedExports.ValueKind == JsonValueKind.Object)
+                root = nestedExports;
+
+            if (root.ValueKind != JsonValueKind.Object)
+                throw new InvalidOperationException("map root must be a JSON object");
+
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var entry in root.EnumerateObject()) {
+                if (entry.Value.ValueKind != JsonValueKind.String)
+                    continue;
+
+                AddApiExportMapping(map, entry.Name, entry.Value.GetString());
+            }
+
+            return map;
+        }
+
+        private static void AddApiExportMapping(Dictionary<string, string> map, string left, string right) {
+            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+                return;
+
+            var leftName = TrimLeadingUnderscores(left);
+            var rightName = TrimLeadingUnderscores(right);
+            var leftIsReal = leftName.StartsWith("il2cpp_");
+            var rightIsReal = rightName.StartsWith("il2cpp_");
+
+            if (leftIsReal && !rightIsReal)
+                map.TryAdd(rightName, leftName);
+            else if (!leftIsReal && rightIsReal)
+                map.TryAdd(leftName, rightName);
+            else
+                map.TryAdd(leftName, rightName);
+        }
+
+        private static string NormalizeExportName(string exportName, IReadOnlyDictionary<string, string> mappedExportNames, Regex exportRgx) {
+            var strippedName = TrimLeadingUnderscores(exportName);
+
+            if (strippedName.StartsWith("il2cpp_"))
+                return strippedName;
+
+            if (mappedExportNames.TryGetValue(exportName, out var mappedName)
+                || mappedExportNames.TryGetValue(strippedName, out mappedName))
+                return exportRgx.Replace(mappedName, "");
+
+            return null;
+        }
+
+        private static string TrimLeadingUnderscores(string name) {
+            var index = 0;
+            while (index < name.Length && name[index] == '_')
+                index++;
+
+            return name[index..];
         }
     }
 }

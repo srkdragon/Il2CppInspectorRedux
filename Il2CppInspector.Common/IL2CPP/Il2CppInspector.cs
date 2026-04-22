@@ -530,9 +530,14 @@ namespace Il2CppInspector
 
         // Load from a binary file and metadata file
         public static List<Il2CppInspector> LoadFromFile(string binaryFile, string metadataFile, LoadOptions loadOptions = null, EventHandler<string> statusCallback = null, bool silent = false)
-            => LoadFromStream(new FileStream(binaryFile, FileMode.Open, FileAccess.Read, FileShare.Read),
-                                new MemoryStream(File.ReadAllBytes(metadataFile)),
-                                loadOptions, statusCallback, silent);
+        {
+            loadOptions ??= new LoadOptions();
+            loadOptions.BinaryFilePath ??= binaryFile;
+
+            return LoadFromStream(new FileStream(binaryFile, FileMode.Open, FileAccess.Read, FileShare.Read),
+                new MemoryStream(File.ReadAllBytes(metadataFile)),
+                loadOptions, statusCallback, silent);
+        }
 
         // Load from a binary stream and metadata stream
         // Must be a seekable stream otherwise we catch a System.IO.NotSupportedException

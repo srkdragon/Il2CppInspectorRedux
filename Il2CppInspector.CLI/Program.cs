@@ -41,6 +41,9 @@ namespace Il2CppInspector.CLI
             [Option("image-base", Required = false, HelpText = "For ELF memory dumps, the image base address in hex (ignored for standard ELF files and other file formats)")]
             public string ElfImageBaseString { get; set; }
 
+            [Option("api-exports-map", Required = false, HelpText = "JSON file mapping obfuscated binary export names to il2cpp_* API names. If omitted, Il2CppInspector will auto-load <binary>.il2cpp-exports.json or <binary>.exports.json when present.")]
+            public string ApiExportsMapFile { get; set; }
+
             [Option("select-outputs", Required = false, HelpText = "Only generate outputs specified on the command line (use --cs-out, --py-out, --cpp-out, --json-out, --dll-out to select outputs). If not specified, all outputs are generated")]
             public bool SpecifiedOutputsOnly { get; set; }
 
@@ -222,7 +225,8 @@ namespace Il2CppInspector.CLI
 
             // Set load options
             var loadOptions = new LoadOptions {
-                BinaryFilePath = options.BinaryFiles.First()
+                BinaryFilePath = options.BinaryFiles.First(),
+                ApiExportMapFilePath = options.ApiExportsMapFile
             };
 
             // Check image base

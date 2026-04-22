@@ -32,6 +32,8 @@ namespace Il2CppInspector
         int Bits { get; }
         ulong GlobalOffset { get; } // The virtual address where the code section (.text) would be loaded in memory
         ulong ImageBase { get; } // The virtual address of where the image would be loaded in memory (same as GlobalOffset except for PE)
+        string BinaryFilePath { get; }
+        string ApiExportMapFilePath { get; }
         IEnumerable<IFileFormatStream> TryNextLoadStrategy(); // Some images can be loaded multiple ways, eg. default, packed
         Dictionary<string, Symbol> GetSymbolTable();
         uint[] GetFunctionTable();
@@ -202,6 +204,10 @@ namespace Il2CppInspector
         public ulong GlobalOffset { get; protected set; }
 
         public virtual ulong ImageBase => GlobalOffset;
+
+        public string BinaryFilePath => LoadOptions?.BinaryFilePath;
+
+        public string ApiExportMapFilePath => LoadOptions?.ApiExportMapFilePath;
 
         public virtual string Format => throw new NotImplementedException();
 

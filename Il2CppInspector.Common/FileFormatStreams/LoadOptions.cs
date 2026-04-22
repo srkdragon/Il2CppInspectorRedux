@@ -17,5 +17,8 @@ namespace Il2CppInspector
         // For packed PE files, we need the full path to reload the file via Win32 API
         // Ignored for all other cases
         public string BinaryFilePath { get; set; }
+
+        // Optional JSON file mapping obfuscated export names to their il2cpp_* names
+        public string ApiExportMapFilePath { get; set; }
     }
 }
